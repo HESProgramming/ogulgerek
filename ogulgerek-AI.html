@@ -137,11 +137,17 @@ const light1 = new THREE.PointLight(0xff66cc, 2.5, 60);
 light1.position.set(3, 3, 3);
 scene.add(light1);
 
+const light2 = new THREE.PointLight(0x66ccff, 1.5, 50);
+light2.position.set(-3, -2, 2);
+scene.add(light2);
+
 const ambient = new THREE.AmbientLight(0x222222);
 scene.add(ambient);
 
-// ====== 3D GÜL (ANA GÜL) ======
+// ====== 3D GÜL ======
 const roseGroup = new THREE.Group();
+
+// Gül merkezi (tomurcuk)
 const centerGeo = new THREE.SphereGeometry(0.4, 32, 32);
 const centerMat = new THREE.MeshStandardMaterial({
     color: 0xff0044,
@@ -152,6 +158,7 @@ const centerMat = new THREE.MeshStandardMaterial({
 const center = new THREE.Mesh(centerGeo, centerMat);
 roseGroup.add(center);
 
+// Gül yaprakları (petaller - halka şeklinde)
 for (let i = 0; i < 10; i++) {
     const petalGeo = new THREE.SphereGeometry(0.25, 16, 16);
     const petalMat = new THREE.MeshStandardMaterial({
@@ -161,14 +168,18 @@ for (let i = 0; i < 10; i++) {
     });
 
     const petal = new THREE.Mesh(petalGeo, petalMat);
+
     const angle = (i / 10) * Math.PI * 2;
     petal.position.x = Math.cos(angle) * 0.6;
     petal.position.y = Math.sin(angle) * 0.3;
+    petal.position.z = Math.sin(angle) * 0.2;
+
     roseGroup.add(petal);
 }
+
 scene.add(roseGroup);
 
-// ====== UÇUŞAN YAPRAKLAR ======
+// ====== UÇUŞAN GÜL YAPRAKLARI ======
 const petalGeom = new THREE.BufferGeometry();
 const petalCount = 1500;
 const petalPos = new Float32Array(petalCount * 3);
@@ -179,84 +190,145 @@ for (let i = 0; i < petalCount * 3; i++) {
 
 petalGeom.setAttribute("position", new THREE.BufferAttribute(petalPos, 3));
 
-const petals = new THREE.Points(
-    petalGeom,
-    new THREE.PointsMaterial({ size: 0.06, color: 0xff6699 })
-);
+const petalMat = new THREE.PointsMaterial({
+    size: 0.06,
+    color: 0xff6699,
+    transparent: true,
+    opacity: 0.8
+});
+
+const petals = new THREE.Points(petalGeom, petalMat);
 scene.add(petals);
 
-// ====== YENİ GÜL EKLEME (Her EVET'te) ======
-function addRose() {
-    const newRose = roseGroup.clone();
-    newRose.position.x = (Math.random() - 0.5) * 4;
-    newRose.position.y = (Math.random() - 0.5) * 3;
-    newRose.position.z = -2;
-    scene.add(newRose);
-}
+// ====== YILDIZ KAYMASI ======
+let shootingStar = null;
+function createShootingStar() {
+    const geo = new THREE.SphereGeometry(0.05, 8, 8);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    shootingStar = new THREE.Mesh(geo, mat);
 
-// ====== ARKA PLAN DEĞİŞTİRME ======
-function changeBackground(choice) {
-    if (choice === "yes") {
-        scene.background = new THREE.Color(0x200020); // daha pembe
-    } else {
-        scene.background = new THREE.Color(0x050013); // daha koyu
+    shootingStar.position.set(-10, 5 + Math.random() * 3, -5);
+    scene.add(shootingStar);
+}
+setInterval(createShootingStar, 4000);
+
+// ====== PATLAMA EFEKTİ ======
+let explosionParticles = null;
+
+function triggerExplosion() {
+    const geo = new THREE.BufferGeometry();
+    const count = 2000;
+    const arr = new Float32Array(count * 3);
+
+    for (let i = 0; i < count * 3; i++) {
+        arr[i] = (Math.random() - 0.5) * 5;
     }
-}
 
-// ====== FİNAL ANİMASYONU ======
-function finalAnimation() {
-    for (let i = 0; i < 10; i++) addRose();
-    scene.background = new THREE.Color(0x330033);
+    geo.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+
+    const mat = new THREE.PointsMaterial({
+        size: 0.05,
+        color: 0xff99cc,
+        transparent: true,
+        opacity: 1
+    });
+
+    explosionParticles = new THREE.Points(geo, mat);
+    scene.add(explosionParticles);
+
+    setTimeout(() => {
+        scene.remove(explosionParticles);
+        explosionParticles = null;
+    }, 1500);
 }
 
 // ====== ANİMASYON ======
 let time = 0;
+
 function animate() {
     requestAnimationFrame(animate);
     time += 0.01;
+
     roseGroup.rotation.y += 0.01;
+    roseGroup.rotation.x = Math.sin(time) * 0.05;
+
     petals.rotation.y += 0.001;
+    petals.rotation.x += 0.0005;
+
+    if (shootingStar) {
+        shootingStar.position.x += 0.1;
+        shootingStar.position.y -= 0.05;
+        if (shootingStar.position.x > 10) {
+            scene.remove(shootingStar);
+            shootingStar = null;
+        }
+    }
+
+    camera.position.x = Math.sin(time * 0.2) * 0.3;
+    camera.position.y = Math.cos(time * 0.15) * 0.2;
+    camera.lookAt(0, 0, 0);
+
     renderer.render(scene, camera);
 }
 animate();
 
-// ====== AI İÇİN HAZIR ======
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ====== AI KONUŞMA GEÇMİŞİ ======
 let conversationHistory = [
   "Soru: Ogulgerek, benimle tanışmak ister misin?"
 ];
 
+// ====== BUTONLAR (AI BAĞLANTILI) ======
 async function answer(choice) {
-    changeBackground(choice);
+    const responseBox = document.getElementById("response");
+    const messageBox = document.getElementById("message");
 
-    if (choice === "yes") addRose();
+    triggerExplosion(); 
 
-    document.getElementById("response").innerHTML =
-      "Ogulgerek düşünüyor... 🌹";
+    conversationHistory.push(`Ogulgerek: ${choice.toUpperCase()}`);
 
-    const res = await fetch("https://SENIN-SUNUCUN/ask-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            history: conversationHistory,
-            lastAnswer: choice
-        })
-    });
+    responseBox.innerHTML = "Ogulgerek düşünüyor... 🌹";
 
-    const data = await res.json();
-    const aiText = data.message;
+    try {
+        const res = await fetch("https://ogulgerek-server-abc123.onrender.com/ask-ai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                history: conversationHistory,
+                lastAnswer: choice
+            })
+        });
 
-    if (aiText.includes("IKNA_OLDU")) {
-        document.getElementById("message").innerHTML =
-          "✨ Ogulgerek, teşekkür ederim! 🌹";
-        document.getElementById("response").innerHTML =
-          aiText.replace("IKNA_OLDU", "");
-        finalAnimation();
-        return;
+        const data = await res.json();
+        const aiText = data.message;
+
+        if (aiText.includes("IKNA_OLDU")) {
+            messageBox.innerHTML = "✨ Ogulgerek, teşekkür ederim! 🌹";
+            responseBox.innerHTML = aiText.replace("IKNA_OLDU", "");
+
+            triggerExplosion();
+            setTimeout(triggerExplosion, 300);
+            setTimeout(triggerExplosion, 600);
+            return;
+        }
+
+        messageBox.innerHTML = aiText;
+        responseBox.innerHTML = "";
+
+        conversationHistory.push(`AI: ${aiText}`);
+
+    } catch (err) {
+        console.error(err);
+        responseBox.innerHTML =
+          "Bağlantı hatası oldu… tekrar dener misin? 🌹";
     }
-
-    document.getElementById("message").innerHTML = aiText;
-    conversationHistory.push(`AI: ${aiText}`);
 }
 </script>
+
 </body>
 </html>
